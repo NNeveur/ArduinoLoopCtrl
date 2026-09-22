@@ -1,52 +1,61 @@
 /*
 | Commande | Paramètres | Description |
 | :--- | :--- | :--- |
-| `$SINIT <ant>` | `<ant>` (0-2) | Initialisation du contrôleur d'antenne RS485 pour l'antenne cible. |
-| `$SON <ant>` | `<ant>` (0-2) | Activation de l'alimentation moteur de l'antenne spécifiée. |
-| `$SOF <ant>` | `<ant>` (0-2) | Coupure d'alimentation moteur pour économie d'énergie. |
-| `$SINC <ant> <res>` | `<ant> <res>` | Déplacement sens horaire pour l'antenne cible avec résolution `res` (0 = 1/8 micropas, 3 = pas entier). |
-| `$SDEC <ant> <res>` | `<ant> <res>` | Déplacement sens anti-horaire pour l'antenne cible avec résolution `res`. |
-| `$SMOV <ant>` | `<ant>` (0-2) | Exécution du déplacement d'un pas sur l'antenne spécifiée. |
-| `$SANT <ant>` | `<ant>` (0-2) | Sélection / Commutation de l'antenne active sur le bus RS485. |
+| `$SINIT<ant>;` | `<ant>` (0-2) | Initialisation du contrôleur d'antenne RS485 pour l'antenne cible. |
+| `$SON<ant>;` | `<ant>` (0-2) | Activation de l'alimentation moteur de l'antenne spécifiée. |
+| `$SOF<ant>;` | `<ant>` (0-2) | Coupure d'alimentation moteur pour économie d'énergie. |
+| `$SINC<ant><res>;` | `<ant> <res>` | Déplacement sens horaire pour l'antenne cible avec résolution `res` (0 = 1/16 micropas, 4 = pas entier). |
+| `$SDEC<ant><res>;` | `<ant> <res>` | Déplacement sens anti-horaire pour l'antenne cible avec résolution `res`. |
+| `$SMOV<ant>;` | `<ant>` (0-2) | Exécution du déplacement d'un pas sur l'antenne spécifiée. |
+| `$SANT<ant>;` | `<ant>` (0-2) | Sélection / Commutation de l'antenne active sur le bus RS485. |
 */
 //
 const int ctrl_ant   = 0;     // Controller antenna assing
 //
+// SparkFun Big easy driver Allegro A4983 or A4988 stepper driver chip
+//
 const int stepctrl_dir   = 3;     // Direction pin
 const int stepctrl_step  = 4;     // Step pin (positive pulse of +1us for each step)
-const int stepctrl_ms2   = 5;     // Microstepping pin MS2
-const int stepctrl_ms1   = 6;     // Microstepping pin MS1
-const int stepctrl_enable= 7;     // Enable pin
+const int stepctrl_enable= 5;     // Enable pin
+const int stepctrl_ms3   = 6;     // Microstepping pin MS2
+const int stepctrl_ms2   = 7;     // Microstepping pin MS2
+const int stepctrl_ms1   = 8;     // Microstepping pin MS1
 //
 // Increment Stepper
 //
 void stepctrl_Incr(uint8_t res)
 {
-  res = 3 - res;                       // Reversed: 0 for no microsteps
+  res = 4 - res;                       // Reversed: 0 for no microsteps
                                        // 1 for half step (2 microsteps)
                                        // 2 for quarter step (4 microsteps)
                                        // 3 for eighth step (8 microsteps)
+                                       // 4 for sixteenth step (16 microsteps)
 
   stepctrl_PwrOn();                     // Ensure Power On state
   digitalWrite(stepctrl_dir, LOW);      // Clockwise
   digitalWrite(stepctrl_ms1, (res&0x01)?HIGH:LOW);  // ... Microstep resolution
   digitalWrite(stepctrl_ms2, (res&0x02)?HIGH:LOW);
+  digitalWrite(stepctrl_ms3, (res&0x04)?HIGH:LOW);
   digitalWrite(stepctrl_step, HIGH);    // Prime for Movement, turn Step pulse on
+//Serial.print("$SINC");
+//Serial.println(res);
 }
 //
 // Decrement Stepper
 //
 void stepctrl_Decr(uint8_t res)
 {
-  res = 3 - res;                       // Reversed: 0 for no microsteps
+  res = 4 - res;                       // Reversed: 0 for no microsteps
                                        // 1 for half step (2 microsteps)
                                        // 2 for quarter step (4 microsteps)
                                        // 3 for eighth step (8 microsteps)
+									   // 4 for sixteenth step (16 microsteps)
 
   stepctrl_PwrOn();                     // Ensure Power On state
   digitalWrite(stepctrl_dir, HIGH);     // Counterclockwise
   digitalWrite(stepctrl_ms1, (res&0x01)?HIGH:LOW);  // ... Microstep resolution
   digitalWrite(stepctrl_ms2, (res&0x02)?HIGH:LOW);
+  digitalWrite(stepctrl_ms3, (res&0x04)?HIGH:LOW);
   digitalWrite(stepctrl_step, HIGH);    // Prime for Movement, turn Step pulse on
 }
 
@@ -85,6 +94,7 @@ void stepctrl_Init(void)
 {
   pinMode(stepctrl_dir, OUTPUT);        // Direction Pin    
   pinMode(stepctrl_step, OUTPUT);       // Step Pin
+  pinMode(stepctrl_ms3, OUTPUT);        // MS3 pin
   pinMode(stepctrl_ms2, OUTPUT);        // MS2 pin
   pinMode(stepctrl_ms1, OUTPUT);        // MS1 pin
   pinMode(stepctrl_enable, OUTPUT);     // Enable Pin    
@@ -93,7 +103,7 @@ void stepctrl_Init(void)
 
 //*********************************************************************************
 //**
-//**
+//** 
 //**
 //*********************************************************************************
 
@@ -103,52 +113,52 @@ void stepctrl_Init(void)
 
 //-----------------------------------------------------------------------------------------
 //
-char incoming_command_string[50];                                // Input from USB Serial
+char incoming_command_string[50];                                // Input from Serial
 
 void rs485_parse_incoming(void)
 {
-//  uint8_t x;
   char *pEnd;
   uint8_t res;
   uint8_t ant;
-//  int32_t  frq_in;
-
+//Serial.println(incoming_command_string);
 // $SINC <ant> <res>
-  if (!strncasecmp("sinc",incoming_command_string,4))           // Increment Stepper
+  if (!strncasecmp("SINC",incoming_command_string,4))           // Increment Stepper
   {
-    ant = strtol(incoming_command_string+4,&pEnd,0);
     res = strtol(incoming_command_string+5,&pEnd,0);
+    ant = strtol(incoming_command_string+6,&pEnd,0);
 	if (ant == ctrl_ant) stepctrl_Incr(res);
   }
 // $SDEC <ant> <res>
-  else if (!strncasecmp("sdec",incoming_command_string,4))    // Decrement Stepper
+  else if (!strncasecmp("SDEC",incoming_command_string,4))    // Decrement Stepper
   {
-    ant = strtol(incoming_command_string+4,&pEnd,0);
     res = strtol(incoming_command_string+5,&pEnd,0);
+    ant = strtol(incoming_command_string+6,&pEnd,0);
 	if (ant == ctrl_ant)     stepctrl_Decr(res);
   }
 // $SMOV <ant>
-  else if (!strncasecmp("smov",incoming_command_string,4))    // Move Stepper (neends >1+ microsecond delay from positive edge)
+  else if (!strncasecmp("SMOV",incoming_command_string,4))    // Move Stepper (neends >1+ microsecond delay from positive edge)
   {
-    ant = strtol(incoming_command_string+4,&pEnd,0);
+    ant = strtol(incoming_command_string+5,&pEnd,0);
 	if (ant == ctrl_ant)     stepctrl_Move();
   }
 // $SON <ant>
-  else if (!strncasecmp("son",incoming_command_string,3))     // Turn the Stepper On
+  else if (!strncasecmp("SON",incoming_command_string,3))     // Turn the Stepper On
   {
-    ant = strtol(incoming_command_string+3,&pEnd,0);
+    ant = strtol(incoming_command_string+4,&pEnd,0);
 	if (ant == ctrl_ant)     stepctrl_PwrOn();
   }
 // $SOF <ant>
-  else if (!strncasecmp("sof",incoming_command_string,3))     // Turn the Stepper Off
+  else if (!strncasecmp("SOF",incoming_command_string,3))     // Turn the Stepper Off
   {
-    ant = strtol(incoming_command_string+3,&pEnd,0);
+    ant = strtol(incoming_command_string+4,&pEnd,0);
 	if (ant == ctrl_ant)     stepctrl_PwrOff();
   }
 // $INIT <ant>
-  else if (!strncasecmp("sinit",incoming_command_string, 5))     // Init Stepper Outputs
+  else if (!strncasecmp("SINIT",incoming_command_string, 5))     // Init Stepper Outputs
   {
-    ant = strtol(incoming_command_string+5,&pEnd,0);
+Serial.print("$SINIT");
+    ant = strtol(incoming_command_string+6,&pEnd,0);
+Serial.println(ant);
 	if (ant == ctrl_ant)     stepctrl_Init();
   }
   
@@ -234,7 +244,7 @@ void setup()
   uint8_t coldstart;
   
   stepctrl_Init();
-  Serial.begin(38400);                                   // initialize USB virtual serial serial port
+  Serial.begin(9600);                                   // initialize USB virtual serial serial port
   
 //  Serial.println("$m0Ready");
 
