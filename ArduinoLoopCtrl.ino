@@ -12,83 +12,83 @@
 //
 const int ctrl_ant   = 0;     // Controller antenna assing
 //
-const int drv8825_dir   = 3;     // Direction pin
-const int drv8825_step  = 4;     // Step pin (positive pulse of +1us for each step)
-const int drv8825_ms2   = 5;     // Microstepping pin MS2
-const int drv8825_ms1   = 6;     // Microstepping pin MS1
-const int drv8825_enable= 7;     // Enable pin
+const int stepctrl_dir   = 3;     // Direction pin
+const int stepctrl_step  = 4;     // Step pin (positive pulse of +1us for each step)
+const int stepctrl_ms2   = 5;     // Microstepping pin MS2
+const int stepctrl_ms1   = 6;     // Microstepping pin MS1
+const int stepctrl_enable= 7;     // Enable pin
 //
 // Increment Stepper
 //
-void drv8825_Incr(uint8_t res)
+void stepctrl_Incr(uint8_t res)
 {
   res = 3 - res;                       // Reversed: 0 for no microsteps
                                        // 1 for half step (2 microsteps)
                                        // 2 for quarter step (4 microsteps)
                                        // 3 for eighth step (8 microsteps)
 
-  drv8825_PwrOn();                     // Ensure Power On state
-  digitalWrite(drv8825_dir, LOW);      // Clockwise
-  digitalWrite(drv8825_ms1, (res&0x01)?HIGH:LOW);  // ... Microstep resolution
-  digitalWrite(drv8825_ms2, (res&0x02)?HIGH:LOW);
-  digitalWrite(drv8825_step, HIGH);    // Prime for Movement, turn Step pulse on
+  stepctrl_PwrOn();                     // Ensure Power On state
+  digitalWrite(stepctrl_dir, LOW);      // Clockwise
+  digitalWrite(stepctrl_ms1, (res&0x01)?HIGH:LOW);  // ... Microstep resolution
+  digitalWrite(stepctrl_ms2, (res&0x02)?HIGH:LOW);
+  digitalWrite(stepctrl_step, HIGH);    // Prime for Movement, turn Step pulse on
 }
 //
 // Decrement Stepper
 //
-void drv8825_Decr(uint8_t res)
+void stepctrl_Decr(uint8_t res)
 {
   res = 3 - res;                       // Reversed: 0 for no microsteps
                                        // 1 for half step (2 microsteps)
                                        // 2 for quarter step (4 microsteps)
                                        // 3 for eighth step (8 microsteps)
 
-  drv8825_PwrOn();                     // Ensure Power On state
-  digitalWrite(drv8825_dir, HIGH);     // Counterclockwise
-  digitalWrite(drv8825_ms1, (res&0x01)?HIGH:LOW);  // ... Microstep resolution
-  digitalWrite(drv8825_ms2, (res&0x02)?HIGH:LOW);
-  digitalWrite(drv8825_step, HIGH);    // Prime for Movement, turn Step pulse on
+  stepctrl_PwrOn();                     // Ensure Power On state
+  digitalWrite(stepctrl_dir, HIGH);     // Counterclockwise
+  digitalWrite(stepctrl_ms1, (res&0x01)?HIGH:LOW);  // ... Microstep resolution
+  digitalWrite(stepctrl_ms2, (res&0x02)?HIGH:LOW);
+  digitalWrite(stepctrl_step, HIGH);    // Prime for Movement, turn Step pulse on
 }
 
 //
 // Move Stepper (neends >1+ microsecond delay from positive edge)
 //
-void drv8825_Move(void)
+void stepctrl_Move(void)
 {
-  digitalWrite(drv8825_step, LOW);     // Move, turn Step pulse off  
+  digitalWrite(stepctrl_step, LOW);     // Move, turn Step pulse off  
 	delay(50);
-  digitalWrite(drv8825_step, HIGH);     // Move, turn Step pulse off  
+  digitalWrite(stepctrl_step, HIGH);     // Move, turn Step pulse on  
 }
 
 //
 // Turn the Stepper On
 //
-void drv8825_PwrOn(void)
+void stepctrl_PwrOn(void)
 {
-  //digitalWrite(drv8825_reset, HIGH); // Release Reset, turn Stepper Motor On
-  digitalWrite(drv8825_enable, LOW);   // Enable Stepper
+  //digitalWrite(stepctrl_reset, HIGH); // Release Reset, turn Stepper Motor On
+  digitalWrite(stepctrl_enable, LOW);   // Enable Stepper
 }
 
 //
 // Turn the Stepper Off
 //
-void drv8825_PwrOff(void)
+void stepctrl_PwrOff(void)
 {
-  //digitalWrite(drv8825_reset, LOW);  // Reset and turn Stepper Motor Off
-  digitalWrite(drv8825_enable, HIGH);  // Disable Stepper, retain last state
+  //digitalWrite(stepctrl_reset, LOW);  // Reset and turn Stepper Motor Off
+  digitalWrite(stepctrl_enable, HIGH);  // Disable Stepper, retain last state
 }
 
 //
 // Init Stepper Outputs
 //
-void drv8825_Init(void)
+void stepctrl_Init(void)
 {
-  pinMode(drv8825_dir, OUTPUT);        // Direction Pin    
-  pinMode(drv8825_step, OUTPUT);       // Step Pin
-  pinMode(drv8825_ms2, OUTPUT);        // MS2 pin
-  pinMode(drv8825_ms1, OUTPUT);        // MS1 pin
-  pinMode(drv8825_enable, OUTPUT);     // Enable Pin    
-  drv8825_PwrOff();                    // Ensure Power Off state
+  pinMode(stepctrl_dir, OUTPUT);        // Direction Pin    
+  pinMode(stepctrl_step, OUTPUT);       // Step Pin
+  pinMode(stepctrl_ms2, OUTPUT);        // MS2 pin
+  pinMode(stepctrl_ms1, OUTPUT);        // MS1 pin
+  pinMode(stepctrl_enable, OUTPUT);     // Enable Pin    
+  stepctrl_PwrOff();                    // Ensure Power Off state
 }
 
 //*********************************************************************************
@@ -107,56 +107,50 @@ char incoming_command_string[50];                                // Input from U
 
 void rs485_parse_incoming(void)
 {
-  uint8_t x;
+//  uint8_t x;
   char *pEnd;
   uint8_t res;
   uint8_t ant;
-  int32_t  frq_in;
+//  int32_t  frq_in;
 
+// $SINC <ant> <res>
   if (!strncasecmp("sinc",incoming_command_string,4))           // Increment Stepper
   {
     ant = strtol(incoming_command_string+4,&pEnd,0);
     res = strtol(incoming_command_string+5,&pEnd,0);
-	if (ant == ctrl_ant) drv8825_Incr(res);
-  //Serial.print("$m0stinc ");
-  //Serial.print(res);
-  //Serial.println("");
+	if (ant == ctrl_ant) stepctrl_Incr(res);
   }
+// $SDEC <ant> <res>
   else if (!strncasecmp("sdec",incoming_command_string,4))    // Decrement Stepper
   {
     ant = strtol(incoming_command_string+4,&pEnd,0);
     res = strtol(incoming_command_string+5,&pEnd,0);
-	if (ant == ctrl_ant)     drv8825_Decr(res);
-  //Serial.print("$m0stdec ");
-  //Serial.print(res);
-  //Serial.println("");
+	if (ant == ctrl_ant)     stepctrl_Decr(res);
   }
+// $SMOV <ant>
   else if (!strncasecmp("smov",incoming_command_string,4))    // Move Stepper (neends >1+ microsecond delay from positive edge)
   {
     ant = strtol(incoming_command_string+4,&pEnd,0);
-	if (ant == ctrl_ant)     drv8825_Move();
-  //Serial.println("$m0stmov");
+	if (ant == ctrl_ant)     stepctrl_Move();
   }
+// $SON <ant>
   else if (!strncasecmp("son",incoming_command_string,3))     // Turn the Stepper On
   {
     ant = strtol(incoming_command_string+3,&pEnd,0);
-	if (ant == ctrl_ant)     drv8825_PwrOn();
-  //Serial.println("$m0ston");
+	if (ant == ctrl_ant)     stepctrl_PwrOn();
   }
+// $SOF <ant>
   else if (!strncasecmp("sof",incoming_command_string,3))     // Turn the Stepper Off
   {
     ant = strtol(incoming_command_string+3,&pEnd,0);
-	if (ant == ctrl_ant)     drv8825_PwrOff();
-  //Serial.println("$m0stoff");
+	if (ant == ctrl_ant)     stepctrl_PwrOff();
   }
+// $INIT <ant>
   else if (!strncasecmp("sinit",incoming_command_string, 5))     // Init Stepper Outputs
   {
     ant = strtol(incoming_command_string+5,&pEnd,0);
-	if (ant == ctrl_ant)     drv8825_Init();
-//    Serial.println("$m0stini");
-}
-
-
+	if (ant == ctrl_ant)     stepctrl_Init();
+  }
   
 } 
 
@@ -239,7 +233,7 @@ void setup()
 {
   uint8_t coldstart;
   
-  drv8825_Init();
+  stepctrl_Init();
   Serial.begin(38400);                                   // initialize USB virtual serial serial port
   
 //  Serial.println("$m0Ready");
